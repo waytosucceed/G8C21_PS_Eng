@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results</title>
+    <link rel="stylesheet" href="wts.css">
+    <link rel="icon" type="image/x-icon" href="Logo_last.png">
+
+    <!-- Include Chart.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Include html2canvas and jsPDF libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/nm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+    <style>
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            z-index: 9999;
+            display: none; /* Hidden by default */
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .header {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 15px 30px;
+            background-color: #fff; 
+            text-align: left;
+            border-bottom: 2px solid #eaeaea;
+        }
+
+        .logo {
+            width: 10%;
+            max-width: 150px;
+        }
+
+        .header-image {
+            width: 50%;
+            height: auto;
+            max-width: 500px;
+        }
+
+        #heading {
+            margin-top: 25px;
+            color: #D6B65B; 
+            font-size: 2.5rem;
+            text-align: center;
+        }
+
+        .chart-container {
+            width: 80%;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
+        }
+
+        canvas {
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+
+        .marks-breakdown {
+            text-align: left;
+            margin: 20px auto;
+            width: 80%;
+            max-width: 800px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
+        }
+
+        .marks-breakdown h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .marks-breakdown ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .marks-breakdown li {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .marks-breakdown li:last-child {
+            border-bottom: none;
+        }
+
+        .download-button {
+            display: block;
+            width: 200px;
+            margin: 30px auto;
+            padding: 10px;
+            font-size: 1.1em;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .download-button:hover {
+            background-color: #0056b3;
+        }
+
+        #questiondiv, #picdiv {
+            margin: 20px auto;
+            width: 80%;
+            max-width: 800px;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
+        }
+
+        #questiondiv h3 {
+            margin-top: 0;
+            color: #D6B65B;
+        }
+
+        #questiondiv div {
+            padding: 10px;
+        }
+
+        @media print {
+            body {
+                font-size: 12pt; /* Adjust this size as needed */
+            }
+
+            .chart-container, .marks-breakdown, #questiondiv, #picdiv {
+                width: 100%; /* Ensure full width */
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+                border: none;
+
+            }
+
+            canvas {
+                max-width: 100%;
+            }
+
+            .download-button {
+                display: none; /* Hide download button in PDF */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <img src="./assests/logo/Logo.png" alt="Logo" class="logo">
+        <img src="./assests/logo/header.png" alt="Header" class="header-image">
+    </header>
+    <button class="download-button" id="downloadBtn">Download Report</button>
+
+    <div class="chart-container">
+        <canvas id="myBarChart"></canvas>
+    </div>
+
+    <div class="marks-breakdown" id="breakdown">
+        <h2>Marks Breakdown</h2>
+        <ul id="marksList"></ul>
+    </div>
+
+    <div id="picdiv"></div>
+    <div id="questiondiv"></div>
+
+    <button class="download-button" id="downloadBtn2">Download Report</button>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        Downloading...
+    </div>
+
+    <script>
+        function clearLocalStorage() {
+            console.log('Clearing local storage...');
+
+            fetch('questions.json')
+                .then(response => response.json())
+                .then(data => {
+                    const topics = data.topics;
+
+                    topics.forEach(topic => {
+                        localStorage.removeItem(topic.heading + '_completed');
+                        localStorage.removeItem(topic.heading + '_score');
+                        localStorage.removeItem(topic.heading + '_totalQuestions');
+                        localStorage.removeItem(topic.heading + '_results_content');
+                        localStorage.removeItem(topic.heading + '_question_content');
+                    });
+
+                    localStorage.removeItem('topics');
+
+                    console.log('Local storage cleared.');
+                })
+                .catch(error => console.error('Error clearing local storage:', error));
+        }
+
+        function loadAllResults() {
+            const questionContentDiv = document.getElementById('questiondiv');
+            const picContentDiv = document.getElementById('picdiv');
+
+            questionContentDiv.innerHTML = '';
+            picContentDiv.innerHTML = '';
+
+            Object.keys(localStorage).forEach(key => {
+                if (key.includes('_question_content')) {
+                    const content = localStorage.getItem(key);
+                    const topicName = key.replace('_question_content', '');
+
+                    const topicContainer = document.createElement('div');
+                    topicContainer.style.marginBottom = '20px';
+                    topicContainer.style.padding = '10px';
+                    topicContainer.style.border = '1px solid #ddd';
+                    topicContainer.style.borderRadius = '8px';
+                    topicContainer.style.backgroundColor = '#fff';
+
+                    const heading = document.createElement('h3');
+                    heading.textContent = topicName;
+                    heading.style.marginTop = '0';
+                    heading.style.color = '#D6B65B';
+                    topicContainer.appendChild(heading);
+
+                    const contentDiv = document.createElement('div');
+                    contentDiv.innerHTML = content;
+                    contentDiv.style.padding = '10px';
+                    topicContainer.appendChild(contentDiv);
+
+                    questionContentDiv.appendChild(topicContainer);
+                }
+            });
+        }
+
+        loadAllResults();
+
+        const topics = JSON.parse(localStorage.getItem('topics')) || [];
+        const scores = topics.map(topic => parseInt(localStorage.getItem(topic.heading + '_score')) || 0);
+        const totalMarks = topics.map(topic => parseInt(localStorage.getItem(topic.heading + '_totalQuestions')) || 0);
+        const maxTotalMarks = Math.max(...totalMarks);
+
+        const data = {
+            labels: topics.map(topic => topic.heading),
+            datasets: [{
+                label: 'Marks Scored',
+                data: scores,
+                backgroundColor: 'rgba(70, 192, 192, 0.6)',
+                borderColor: 'rgba(70, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        };
+
+        const config = {
+            type: 'bar',
+            data: data,
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: maxTotalMarks 
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                }
+            }
+        };
+
+        const myBarChart = new Chart(
+            document.getElementById('myBarChart'),
+            config
+        );
+
+        function loadMarksBreakdown() {
+            const breakdownList = document.getElementById('marksList');
+            breakdownList.innerHTML = '';
+
+            topics.forEach(topic => {
+                const score = parseInt(localStorage.getItem(topic.heading + '_score')) || 0;
+                const total = parseInt(localStorage.getItem(topic.heading + '_totalQuestions')) || 0;
+
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `<strong>${topic.heading}</strong>: ${score} / ${total}`;
+                breakdownList.appendChild(listItem);
+            });
+        }
+
+        loadMarksBreakdown();
+
+        // function downloadPDF() {
+        //     const loadingOverlay = document.getElementById('loadingOverlay');
+        //     loadingOverlay.style.display = 'flex';
+
+        //     const { jsPDF } = window.jspdf;
+        //     const doc = new jsPDF();
+
+        //     const headerImage = new Image();
+        //     headerImage.src = './assests/logo/header.png';
+        //     headerImage.onload = function() {
+        //         doc.addImage(headerImage, 'PNG', 10, 10, 50, 20);
+
+        //         doc.setFontSize(18);
+        //         doc.text('Results', doc.internal.pageSize.getWidth() / 2, 40, { align: 'center' });
+
+        //         html2canvas(document.getElementById('myBarChart')).then(canvas => {
+        //             const imgData = canvas.toDataURL('image/png');
+        //             const imgProps = doc.getImageProperties(imgData);
+        //             const pdfWidth = doc.internal.pageSize.getWidth();
+        //             const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+        //             doc.addImage(imgData, 'PNG', 10, 50, pdfWidth - 20, pdfHeight);
+
+        //             html2canvas(document.getElementById('breakdown')).then(canvas => {
+        //                 const breakdownImgData = canvas.toDataURL('image/png');
+        //                 const breakdownImgProps = doc.getImageProperties(breakdownImgData);
+        //                 const breakdownPdfHeight = (breakdownImgProps.height * pdfWidth) / breakdownImgProps.width;
+
+        //                 doc.addPage();
+        //                 doc.addImage(breakdownImgData, 'PNG', 10, 10, pdfWidth - 20, breakdownPdfHeight);
+
+        //                 html2canvas(document.getElementById('questiondiv')).then(canvas => {
+        //                     const questionDivImgData = canvas.toDataURL('image/png');
+        //                     const questionDivImgProps = doc.getImageProperties(questionDivImgData);
+        //                     const questionDivPdfHeight = (questionDivImgProps.height * pdfWidth) / questionDivImgProps.width;
+
+        //                     doc.addPage();
+        //                     doc.addImage(questionDivImgData, 'PNG', 10, 10, pdfWidth - 20, questionDivPdfHeight);
+
+        //                     html2canvas(document.getElementById('picdiv')).then(canvas => {
+        //                         const picDivImgData = canvas.toDataURL('image/png');
+        //                         const picDivImgProps = doc.getImageProperties(picDivImgData);
+        //                         const picDivPdfHeight = (picDivImgProps.height * pdfWidth) / picDivImgProps.width;
+
+        //                         doc.addPage();
+        //                         doc.addImage(picDivImgData, 'PNG', 10, 10, pdfWidth - 20, picDivPdfHeight);
+
+        //                         doc.save('results.pdf');
+        //                         loadingOverlay.style.display = 'none';
+        //                     }).catch(error => {
+        //                         console.error('Error rendering picdiv:', error);
+        //                         loadingOverlay.style.display = 'none';
+        //                     });
+        //                 }).catch(error => {
+        //                     console.error('Error rendering questiondiv:', error);
+        //                     loadingOverlay.style.display = 'none';
+        //                 });
+        //             }).catch(error => {
+        //                 console.error('Error rendering breakdown:', error);
+        //                 loadingOverlay.style.display = 'none';
+        //             });
+        //         }).catch(error => {
+        //             console.error('Error rendering chart:', error);
+        //             loadingOverlay.style.display = 'none';
+        //         });
+        //     };
+        //     clearLocalStorage()
+        // }
+
+
+        function downloadPDF() {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    loadingOverlay.style.display = 'flex';
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const headerImage = new Image();
+    headerImage.src = './assests/logo/header.png';
+    headerImage.onload = function() {
+        doc.addImage(headerImage, 'PNG', 10, 10, 50, 20);
+
+        doc.setFontSize(18);
+        doc.text('Results', doc.internal.pageSize.getWidth() / 2, 40, { align: 'center' });
+
+        html2canvas(document.getElementById('myBarChart')).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const imgProps = doc.getImageProperties(imgData);
+            const pdfWidth = doc.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+            doc.addImage(imgData, 'PNG', 10, 50, pdfWidth - 20, pdfHeight);
+
+            html2canvas(document.getElementById('breakdown')).then(canvas => {
+                const breakdownImgData = canvas.toDataURL('image/png');
+                const breakdownImgProps = doc.getImageProperties(breakdownImgData);
+                const breakdownPdfHeight = (breakdownImgProps.height * pdfWidth) / breakdownImgProps.width;
+
+                doc.addPage();
+                doc.addImage(breakdownImgData, 'PNG', 10, 10, pdfWidth - 20, breakdownPdfHeight);
+
+                html2canvas(document.getElementById('questiondiv')).then(canvas => {
+                    const questionDivImgData = canvas.toDataURL('image/png');
+                    const questionDivImgProps = doc.getImageProperties(questionDivImgData);
+                    const questionDivPdfHeight = (questionDivImgProps.height * pdfWidth) / questionDivImgProps.width;
+
+                    doc.addPage();
+                    doc.addImage(questionDivImgData, 'PNG', 10, 10, pdfWidth - 20, questionDivPdfHeight);
+
+                    html2canvas(document.getElementById('picdiv')).then(canvas => {
+                        const picDivImgData = canvas.toDataURL('image/png');
+                        const picDivImgProps = doc.getImageProperties(picDivImgData);
+                        const picDivPdfHeight = (picDivImgProps.height * pdfWidth) / picDivImgProps.width;
+
+                        doc.addPage();
+                        doc.addImage(picDivImgData, 'PNG', 10, 10, pdfWidth - 20, picDivPdfHeight);
+
+                        doc.save('results.pdf');
+                        loadingOverlay.style.display = 'none';
+                        clearLocalStorage(); // Clear local storage after PDF generation
+                    }).catch(error => {
+                        console.error('Error rendering picdiv:', error);
+                        loadingOverlay.style.display = 'none';
+                    });
+                }).catch(error => {
+                    console.error('Error rendering questiondiv:', error);
+                    loadingOverlay.style.display = 'none';
+                });
+            }).catch(error => {
+                console.error('Error rendering breakdown:', error);
+                loadingOverlay.style.display = 'none';
+            });
+        }).catch(error => {
+            console.error('Error rendering chart:', error);
+            loadingOverlay.style.display = 'none';
+        });
+    };
+}
+
+        document.getElementById('downloadBtn').addEventListener('click', downloadPDF);
+        document.getElementById('downloadBtn2').addEventListener('click', downloadPDF);
+    </script>
+</body>
+</html>
